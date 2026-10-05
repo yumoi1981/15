@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>箱詰めシミュレーター</title>
+<style>
+:root{
+  --bg:#f3f1ec; --panel:#fbfaf7; --ink:#1f2328; --sub:#6b6f76; --line:#dcd8cf;
+  --accent:#c2541c; --ok:#2f7d4f; --ng:#b3261e; --gray:#a3a6ab; --field:#ffffff;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;font-size:14px;display:flex;overflow:hidden}
+.num{font-variant-numeric:tabular-nums}
+#side{width:430px;min-width:430px;height:100%;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column}
+#side header{padding:18px 20px 12px;border-bottom:1px solid var(--line)}
+h1{font-size:17px;margin:0;letter-spacing:.04em}
+.sec{padding:14px 20px;border-bottom:1px solid var(--line)}
+.sec h2{font-size:11px;letter-spacing:.12em;color:var(--sub);margin:0 0 10px;font-weight:600}
+.presets{display:flex;gap:8px;margin-bottom:10px}
+.presets button{flex:1;padding:8px 6px;border:1px solid var(--line);background:var(--field);border-radius:6px;cursor:pointer;font-size:13px;color:var(--ink);line-height:1.35}
+.presets button small{display:block;color:var(--sub);font-size:11px}
+.presets button.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:#fff6f0}
+.dims{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.dims.four{grid-template-columns:repeat(4,1fr)}
+.fld label{display:block;font-size:11px;color:var(--sub);margin-bottom:3px}
+.fld .wrap{position:relative}
+.fld input{width:100%;padding:8px 26px 8px 9px;border:1px solid var(--line);border-radius:6px;font-size:15px;background:var(--field);color:var(--ink);font-variant-numeric:tabular-nums;outline:none}
+.fld input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(194,84,28,.15)}
+.fld .u{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--sub);pointer-events:none}
+.fld input.err{border-color:var(--ng);animation:shake .25s}
+@keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.limit{margin-top:8px;font-size:12px;color:var(--sub)}
+.hint{margin-top:8px;font-size:11.5px;color:var(--sub)}
+kbd{font-family:inherit;font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:#fff}
+#listWrap{flex:1;overflow:auto;padding:6px 12px 16px}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;color:var(--sub);font-weight:500;text-align:right;padding:6px 6px;position:sticky;top:0;background:var(--panel)}
+th:first-child{text-align:left}
+td{padding:5px 6px;border-top:1px solid #ece9e2;text-align:right;white-space:nowrap}
+td:first-child{text-align:left}
+tr.item:hover td{background:#f2eee6}
+.tag{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.dot{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.15)}
+.cell{cursor:text;padding:2px 5px;border-radius:4px;border:1px solid transparent}
+.cell:hover{border-color:var(--line);background:#fff}
+.cell input{width:54px;padding:2px 4px;border:1px solid var(--accent);border-radius:4px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums;outline:none}
+tr.out td{color:var(--gray)}
+tr.out .dot{background:var(--gray)!important}
+.st{font-size:11px;padding:1px 6px;border-radius:10px}
+.st.in{color:var(--ok);background:#e6f2ea}
+.st.out{color:#fff;background:var(--gray)}
+.del{border:none;background:none;color:var(--sub);cursor:pointer;font-size:15px;padding:0 4px;border-radius:4px}
+.del:hover{color:var(--ng);background:#fbe9e7}
+.empty{color:var(--sub);text-align:center;padding:28px 0;font-size:13px}
+#main{flex:1;display:flex;flex-direction:column;min-width:0}
+#result{padding:16px 22px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+#verdict{font-size:22px;font-weight:700;letter-spacing:.02em}
+#verdict.ok{color:var(--ok)} #verdict.ng{color:var(--ng)} #verdict.none{color:var(--sub);font-weight:500;font-size:16px}
+.meter{min-width:220px}
+.meter .lbl{font-size:12px;color:var(--sub);margin-bottom:4px}
+.meter .val{font-size:16px;font-weight:600}
+.bar{height:6px;background:#e7e3da;border-radius:3px;margin-top:5px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:3px;transition:width .2s}
+.bar i.hi{background:var(--accent)}
+#deepBox{margin-left:auto;display:flex;align-items:center;gap:10px}
+#deepBtn{padding:9px 16px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600}
+#deepBtn:disabled{opacity:.55;cursor:default}
+#deepMsg{font-size:12px;color:var(--sub);max-width:220px}
+#viewWrap{flex:1;position:relative;min-height:0}
+#view{position:absolute;inset:0}
+#note{position:absolute;left:14px;bottom:12px;font-size:11.5px;color:var(--sub);background:rgba(251,250,247,.85);padding:5px 9px;border-radius:5px;pointer-events:none}
+#tip{position:fixed;pointer-events:none;background:#1f2328;color:#fff;font-size:12px;padding:6px 9px;border-radius:5px;display:none;z-index:10;white-space:nowrap}
+#viewHelp{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--sub);pointer-events:none}
+</style>
+</head>
+<body>
+<aside id="side">
+  <header><h1>箱詰めシミュレーター</h1></header>
+
+  <div class="sec">
+    <h2>大箱</h2>
+    <div class="presets">
+      <button data-p="0"><span class="num">80 × 60 × 44</span><small>上限 18 kg</small></button>
+      <button data-p="1"><span class="num">80 × 60 × 33</span><small>上限 23 kg</small></button>
+    </div>
+    <div class="dims">
+      <div class="fld"><label>縦</label><div class="wrap"><input id="cL" inputmode="decimal" value="80"><span class="u">cm</span></div></div>
+      <div class="fld"><label>横</label><div class="wrap"><input id="cW" inputmode="decimal" value="60"><span class="u">cm</span></div></div>
+      <div class="fld"><label>高さ</label><div class="wrap"><input id="cH" inputmode="decimal" value="44"><span class="u">cm</span></div></div>
+    </div>
+    <div class="limit" id="limitTxt"></div>
+  </div>
+
+  <div class="sec">
+    <h2>小箱を追加</h2>
+    <div class="dims four" id="addRow">
+      <div class="fld"><label>縦</label><div class="wrap"><input id="iL" inputmode="decimal" autocomplete="off"><span class="u">cm</span></div></div>
+      <div class="fld"><label>横</label><div class="wrap"><input id="iW" inputmode="decimal" autocomplete="off"><span class="u">cm</span></div></div>
+      <div class="fld"><label>高さ</label><div class="wrap"><input id="iH" inputmode="decimal" autocomplete="off"><span class="u">cm</span></div></div>
+      <div class="fld"><label>重さ</label><div class="wrap"><input id="iKg" inputmode="decimal" autocomplete="off"><span class="u">kg</span></div></div>
+    </div>
+    <div class="hint"><kbd>Enter</kbd> で次の欄へ。重さで <kbd>Enter</kbd> を押すと追加されます。</div>
+  </div>
+
+  <div id="listWrap">
+    <table>
+      <thead><tr><th>No.</th><th>縦</th><th>横</th><th>高さ</th><th>重さ</th><th></th><th></th></tr></thead>
+      <tbody id="list"></tbody>
+    </table>
+    <div class="empty" id="empty">まだ小箱がありません</div>
+  </div>
+</aside>
+
+<main id="main">
+  <div id="result">
+    <div id="verdict" class="none">小箱を入力してください</div>
+    <div class="meter">
+      <div class="lbl">積載重量</div>
+      <div class="val num" id="wVal">—</div>
+      <div class="bar"><i id="wBar" style="width:0"></i></div>
+    </div>
+    <div id="deepBox">
+      <div id="deepMsg"></div>
+      <button id="deepBtn" disabled>もっと探す</button>
+    </div>
+  </div>
+  <div id="viewWrap">
+    <div id="view"></div>
+    <div id="note">近似計算のため、手詰めならさらに入る可能性があります。</div>
+    <div id="viewHelp">ドラッグで回転・スクロールで拡大縮小・右ドラッグで移動</div>
+  </div>
+</main>
+<div id="tip"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+/* ===== PACKER START ===== */
+const EPS = 1e-6;
+const SUPPORT_RATIO = 0.5; // 下から支えられている面積が底面の半分以上ならOK
+
+function rotations(d){
+  const [a,b,c]=d, all=[[a,b,c],[a,c,b],[b,a,c],[b,c,a],[c,a,b],[c,b,a]];
+  const seen=new Set(), out=[];
+  for(const r of all){const k=r.join(',');if(!seen.has(k)){seen.add(k);out.push(r);}}
+  return out;
+}
+
+const SCORERS = [
+  (x,y,z,a,b,c)=> z*1e6 + y*1e3 + x,
+  (x,y,z,a,b,c)=> (z+c)*1e6 + y*1e3 + x,
+  (x,y,z,a,b,c)=> z*1e6 + x*1e3 + y,
+  (x,y,z,a,b,c)=> (z+c)*1e6 + (x+a)*1e3 + (y+b),
+];
+
+// items: [{d:[l,w,h], kg}], C:[X,Y,Z], limit:kg or null
+function packOrder(items, order, C, limit, scorer){
+  const [X,Y,Z]=C, placed=[]; let weight=0;
+  const xs=[0], ys=[0];
+  for(const idx of order){
+    const it=items[idx];
+    if(limit!=null && weight+it.kg > limit+1e-9) continue;
+    let best=null;
+    for(const r of it.rots){
+      const [a,b,c]=r;
+      if(a>X+EPS||b>Y+EPS||c>Z+EPS) continue;
+      const cx=xs.concat([X-a]), cy=ys.concat([Y-b]);
+      for(const x of cx){
+        if(x<-EPS||x+a>X+EPS) continue;
+        for(const y of cy){
+          if(y<-EPS||y+b>Y+EPS) continue;
+          let z=0;
+          for(const p of placed){
+            if(p.x<x+a-EPS && x<p.x+p.a-EPS && p.y<y+b-EPS && y<p.y+p.b-EPS){
+              const t=p.z+p.c; if(t>z) z=t;
+            }
+          }
+          if(z+c>Z+EPS) continue;
+          if(z>EPS){
+            let sup=0;
+            for(const p of placed){
+              if(Math.abs(p.z+p.c-z)<EPS){
+                const ox=Math.min(x+a,p.x+p.a)-Math.max(x,p.x), oy=Math.min(y+b,p.y+p.b)-Math.max(y,p.y);
+                if(ox>0&&oy>0) sup+=ox*oy;
+              }
+            }
+            if(sup < SUPPORT_RATIO*a*b - EPS) continue;
+          }
+          const s=scorer(x,y,z,a,b,c);
+          if(!best||s<best.s) best={s,x,y,z,a,b,c};
+        }
+      }
+    }
+    if(best){
+      placed.push({idx,x:best.x,y:best.y,z:best.z,a:best.a,b:best.b,c:best.c});
+      weight+=it.kg;
+      const nx=best.x+best.a, ny=best.y+best.b;
+      if(!xs.some(v=>Math.abs(v-nx)<EPS)) xs.push(nx);
+      if(!ys.some(v=>Math.abs(v-ny)<EPS)) ys.push(ny);
+    }
+  }
+  let vol=0; for(const p of placed) vol+=p.a*p.b*p.c;
+  return {placed, weight, count:placed.length, vol, order};
+}
+
+function better(A,B){ // AがBより良いか
+  if(!B) return true;
+  const wa=Math.round(A.weight*1000), wb=Math.round(B.weight*1000);
+  if(wa!==wb) return wa>wb;
+  if(A.count!==B.count) return A.count>B.count;
+  return A.vol>B.vol+EPS;
+}
+
+// 重量上限内で合計重量が最大になる組み合わせ（10g単位）
+function knapsack(items, limit){
+  const n=items.length, L=Math.round(limit*100);
+  const w=items.map(it=>Math.round(it.kg*100));
+  const reach=new Uint8Array(L+1); reach[0]=1;
+  const take=[];
+  for(let i=0;i<n;i++){
+    const t=new Uint8Array(L+1);
+    for(let s=L;s>=w[i];s--){ if(!reach[s]&&reach[s-w[i]]){reach[s]=1;t[s]=1;} }
+    take.push(t);
+  }
+  let s=L; while(s>0&&!reach[s]) s--;
+  const chosen=new Set();
+  for(let i=n-1;i>=0&&s>0;i--){ if(take[i][s]){chosen.add(i); s-=w[i];} }
+  return chosen;
+}
+
+const by=(f)=>(i,j)=>f(j)-f(i);
+function baseOrders(items, limit){
+  const idx=items.map((_,i)=>i);
+  const vol=i=>items[i].d[0]*items[i].d[1]*items[i].d[2];
+  const kg=i=>items[i].kg;
+  const maxd=i=>Math.max(...items[i].d);
+  const area=i=>{const s=[...items[i].d].sort((a,b)=>b-a);return s[0]*s[1];};
+  const orders=[
+    idx.slice().sort((i,j)=>kg(j)-kg(i)||vol(j)-vol(i)),
+    idx.slice().sort(by(vol)),
+    idx.slice().sort(by(maxd)),
+    idx.slice().sort(by(area)),
+  ];
+  if(limit!=null){
+    const ks=knapsack(items,limit);
+    const first=idx.filter(i=>ks.has(i)).sort(by(vol));
+    const rest=idx.filter(i=>!ks.has(i)).sort(by(kg));
+    orders.push(first.concat(rest));
+  }
+  return orders;
+}
+
+function prepare(raw){ return raw.map(r=>({d:r.d, kg:r.kg, rots:rotations(r.d)})); }
+
+function fastPack(raw, C, limit){
+  const items=prepare(raw); let best=null;
+  if(!items.length) return {placed:[],weight:0,count:0,vol:0,order:[]};
+  const scs = items.length>35 ? SCORERS.slice(0,2) : SCORERS;
+  for(const o of baseOrders(items,limit))
+    for(const sc of scs){
+      const r=packOrder(items,o,C,limit,sc); r.sc=sc;
+      if(better(r,best)) best=r;
+    }
+  return best;
+}
+
+function mutate(order){
+  const o=order.slice(), n=o.length; if(n<2) return o;
+  const m=Math.random();
+  if(m<0.45){ const i=Math.random()*n|0, j=Math.random()*n|0; [o[i],o[j]]=[o[j],o[i]]; }
+  else if(m<0.8){ const i=Math.random()*n|0; const [v]=o.splice(i,1); o.splice(Math.random()*n|0,0,v); }
+  else { for(let i=n-1;i>0;i--){const j=Math.random()*(i+1)|0;[o[i],o[j]]=[o[j],o[i]];} }
+  return o;
+}
+/* ===== PACKER END ===== */
+
+// ---------- 状態 ----------
+const PRESETS=[{d:[80,60,44],limit:18},{d:[80,60,33],limit:23}];
+const items=[];      // {d:[縦,横,高さ], kg}
+let result=null;     // 現在の結果
+let gen=0;           // 入力変更ごとに増える
+let deepRunning=false, deepDone=false;
+const $=id=>document.getElementById(id);
+
+function parseNum(s){
+  if(s==null) return NaN;
+  s=String(s).trim().replace(/[０-９．，]/g,ch=>{
+    if(ch==='．'||ch==='，') return '.';
+    return String.fromCharCode(ch.charCodeAt(0)-0xFEE0);
+  }).replace(',', '.');
+  if(s==='') return NaN;
+  const v=Number(s); return isFinite(v)?v:NaN;
+}
+const fmt=v=>{ const s=(Math.round(v*100)/100).toString(); return s; };
+
+function container(){
+  const L=parseNum($('cL').value), W=parseNum($('cW').value), H=parseNum($('cH').value);
+  if(!(L>0&&W>0&&H>0)) return null;
+  let limit=null, preset=-1;
+  PRESETS.forEach((p,i)=>{
+    const base=[L,W].sort((a,b)=>a-b).join(','), pb=[p.d[0],p.d[1]].sort((a,b)=>a-b).join(',');
+    if(base===pb && Math.abs(H-p.d[2])<EPS){limit=p.limit;preset=i;}
+  });
+  return {C:[L,W,H], limit, preset};
+}
+function colorOf(i){ return `hsl(${(i*137.508+20)%360},62%,58%)`; }
+
+// ---------- 判定 ----------
+function recompute(){
+  gen++; deepDone=false; deepRunning=false;
+  const ct=container();
+  document.querySelectorAll('.presets button').forEach(b=>b.classList.toggle('on', ct&&ct.preset===+b.dataset.p));
+  $('limitTxt').textContent = !ct ? '大箱の寸法を入力してください' : ct.limit!=null ? `重量上限：${ct.limit} kg` : '重量上限：なし';
+  if(!ct||!items.length){ result=null; render(); return; }
+  result=fastPack(items, ct.C, ct.limit);
+  render();
+}
+
+function render(){
+  const ct=container();
+  const inSet=new Set(result?result.placed.map(p=>p.idx):[]);
+  // リスト
+  const tb=$('list'); tb.innerHTML='';
+  $('empty').style.display=items.length?'none':'block';
+  items.forEach((it,i)=>{
+    const tr=document.createElement('tr'); tr.className='item'+(result&&!inSet.has(i)?' out':''); tr.dataset.i=i;
+    const st = !result ? '' : inSet.has(i) ? '<span class="st in">収納</span>' : '<span class="st out">入らず</span>';
+    tr.innerHTML=`<td><span class="tag"><span class="dot" style="background:${colorOf(i)}"></span><span class="num">${i+1}</span></span></td>`+
+      ['0','1','2','kg'].map(k=>`<td class="num"><span class="cell" data-k="${k}">${fmt(k==='kg'?it.kg:it.d[+k])}</span></td>`).join('')+
+      `<td>${st}</td><td><button class="del" title="削除">×</button></td>`;
+    tb.appendChild(tr);
+  });
+  // 結果
+  const v=$('verdict'), dm=$('deepMsg'), db=$('deepBtn');
+  if(!result){
+    v.className='none'; v.textContent=ct?'小箱を入力してください':'大箱の寸法を入力してください';
+    $('wVal').textContent='—'; $('wBar').style.width='0';
+    db.disabled=true; dm.textContent='';
+  }else{
+    const over=items.length-result.count;
+    if(over===0){ v.className='ok'; v.textContent='全部収まります'; }
+    else{ v.className='ng'; v.textContent=`${over}個あふれます`; }
+    const total=items.reduce((s,it)=>s+it.kg,0);
+    const lim=ct.limit;
+    $('wVal').innerHTML = `${result.weight.toFixed(2)} kg` + (lim!=null?` <span style="color:var(--sub);font-weight:400">/ 上限 ${lim} kg</span>`:` <span style="color:var(--sub);font-weight:400">/ 上限なし</span>`) +
+      (over?`<div style="font-size:11.5px;color:var(--sub);font-weight:400">小箱全体 ${total.toFixed(2)} kg</div>`:'');
+    const pct=lim!=null?Math.min(100,result.weight/lim*100):(total?result.weight/total*100:0);
+    $('wBar').style.width=pct+'%'; $('wBar').className=(lim!=null&&pct>95)?'hi':'';
+    db.disabled = deepRunning || over===0;
+    if(!deepRunning) dm.textContent = over===0 ? '' : deepDone ? dm.textContent : 'ぎりぎりのときは詳しく探せます';
+  }
+  draw3D(ct);
+}
+
+// ---------- もっと探す ----------
+function deepSearch(){
+  const ct=container(); if(!ct||!result) return;
+  const myGen=gen; deepRunning=true;
+  const its=prepare(items);
+  let best=result, cur=result;
+  const T=8000, t0=performance.now();
+  const startW=result.weight, startC=result.count;
+  $('deepBtn').disabled=true;
+  function step(){
+    if(myGen!==gen) return;
+    const c0=performance.now();
+    while(performance.now()-c0<40){
+      const base = Math.random()<0.7 ? best : cur;
+      const o=mutate(base.order);
+      const sc=SCORERS[Math.random()*SCORERS.length|0];
+      const r=packOrder(its,o,ct.C,ct.limit,sc);
+      if(better(r,best)){ best=r; }
+      cur = (better(r,cur)||Math.random()<0.05) ? r : cur;
+      if(best.count===items.length) break;
+    }
+    const el=performance.now()-t0;
+    $('deepMsg').textContent=`探索中… ${Math.min(100,Math.round(el/T*100))}%`;
+    if(best.count!==result.count||Math.round(best.weight*1000)!==Math.round(result.weight*1000)){ result=best; render(); }
+    if(el<T && best.count<items.length) setTimeout(step,0);
+    else{
+      deepRunning=false; deepDone=true;
+      $('deepMsg').textContent = (best.weight>startW+1e-9||best.count>startC) ? 'より良い詰め方が見つかりました' : 'これ以上良い詰め方は見つかりませんでした';
+      result=best; render();
+    }
+  }
+  render(); step();
+}
+$('deepBtn').onclick=deepSearch;
+
+// ---------- 入力 ----------
+const addFields=['iL','iW','iH','iKg'].map($);
+addFields.forEach((f,k)=>{
+  f.addEventListener('keydown',e=>{
+    if(e.key!=='Enter'||e.isComposing) return;
+    e.preventDefault();
+    const v=parseNum(f.value);
+    if(!(v>0)){ flash(f); return; }
+    if(k<3){ addFields[k+1].focus(); addFields[k+1].select(); return; }
+    const vals=addFields.map(x=>parseNum(x.value));
+    const bad=vals.findIndex(x=>!(x>0));
+    if(bad>=0){ flash(addFields[bad]); addFields[bad].focus(); return; }
+    items.push({d:vals.slice(0,3), kg:vals[3]});
+    addFields.forEach(x=>x.value='');
+    addFields[0].focus();
+    recompute();
+    $('listWrap').scrollTop=$('listWrap').scrollHeight;
+  });
+});
+function flash(el){ el.classList.remove('err'); void el.offsetWidth; el.classList.add('err'); setTimeout(()=>el.classList.remove('err'),600); }
+
+['cL','cW','cH'].forEach(id=>$(id).addEventListener('input',recompute));
+document.querySelectorAll('.presets button').forEach(b=>b.onclick=()=>{
+  const p=PRESETS[+b.dataset.p]; $('cL').value=p.d[0]; $('cW').value=p.d[1]; $('cH').value=p.d[2]; recompute();
+});
+
+$('list').addEventListener('click',e=>{
+  const tr=e.target.closest('tr.item'); if(!tr) return; const i=+tr.dataset.i;
+  if(e.target.closest('.del')){ items.splice(i,1); recompute(); return; }
+  const cell=e.target.closest('.cell'); if(!cell||cell.querySelector('input')) return;
+  const k=cell.dataset.k, old=k==='kg'?items[i].kg:items[i].d[+k];
+  const inp=document.createElement('input'); inp.value=fmt(old); inp.setAttribute('inputmode','decimal');
+  cell.textContent=''; cell.appendChild(inp); inp.focus(); inp.select();
+  let done=false;
+  const commit=(save)=>{
+    if(done) return; done=true;
+    const v=parseNum(inp.value);
+    if(save && v>0 && Math.abs(v-old)>EPS){ if(k==='kg') items[i].kg=v; else items[i].d[+k]=v; recompute(); }
+    else render();
+  };
+  inp.addEventListener('keydown',ev=>{
+    if(ev.isComposing) return;
+    if(ev.key==='Enter'){ev.preventDefault();commit(true);}
+    if(ev.key==='Escape'){ev.preventDefault();commit(false);}
+  });
+  inp.addEventListener('blur',()=>commit(true));
+});
+$('list').addEventListener('mouseover',e=>{const tr=e.target.closest('tr.item'); highlight(tr?+tr.dataset.i:null);});
+$('list').addEventListener('mouseleave',()=>highlight(null));
+
+// ---------- 3D ----------
+const view=$('view');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0xeceae4);
+view.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(40,1,0.1,5000);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;
+scene.add(new THREE.AmbientLight(0xffffff,0.62));
+const sun=new THREE.DirectionalLight(0xffffff,0.55); sun.position.set(1,2,1.4); scene.add(sun);
+const fill=new THREE.DirectionalLight(0xffffff,0.2); fill.position.set(-1,0.5,-1); scene.add(fill);
+let group=new THREE.Group(); scene.add(group);
+let meshes=[]; let lastCKey='';
+let hoverIdx=null;
+
+function numberSprite(n){
+  const cv=document.createElement('canvas'); cv.width=cv.height=128;
+  const g=cv.getContext('2d');
+  g.fillStyle='rgba(255,255,255,0.92)'; g.beginPath(); g.arc(64,64,54,0,Math.PI*2); g.fill();
+  g.strokeStyle='rgba(0,0,0,0.35)'; g.lineWidth=4; g.stroke();
+  g.fillStyle='#1f2328'; g.font='bold 64px -apple-system,Helvetica,sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+  g.fillText(String(n),64,68);
+  const tex=new THREE.CanvasTexture(cv);
+  return new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true}));
+}
+
+function draw3D(ct){
+  scene.remove(group); group.traverse(o=>{if(o.geometry)o.geometry.dispose(); if(o.material){ if(o.material.map)o.material.map.dispose(); o.material.dispose(); }});
+  group=new THREE.Group(); scene.add(group); meshes=[];
+  if(!ct) return;
+  const [X,Y,Z]=ct.C;
+  // 三.jsの座標： x=縦, z=横, y=高さ（中心を原点に）
+  const ox=-X/2, oz=-Y/2;
+  const cg=new THREE.BoxGeometry(X,Z,Y);
+  const edges=new THREE.LineSegments(new THREE.EdgesGeometry(cg),new THREE.LineBasicMaterial({color:0x5b5f66}));
+  edges.position.set(0,Z/2,0); group.add(edges);
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(X,Y),new THREE.MeshBasicMaterial({color:0xd9d4c8,side:THREE.DoubleSide}));
+  floor.rotation.x=-Math.PI/2; floor.position.y=-0.01; group.add(floor);
+  const grid=new THREE.GridHelper(Math.max(X,Y),Math.round(Math.max(X,Y)/10),0xbdb7aa,0xcfc9bc);
+  grid.scale.set(X/Math.max(X,Y),1,Y/Math.max(X,Y)); grid.position.y=0.01; group.add(grid);
+  const back=new THREE.Mesh(new THREE.BoxGeometry(X,Z,Y),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.08,side:THREE.BackSide,depthWrite:false}));
+  back.position.set(0,Z/2,0); group.add(back);
+
+  if(result) for(const p of result.placed){
+    const g=new THREE.BoxGeometry(p.a,p.c,p.b);
+    const col=new THREE.Color(colorOf(p.idx));
+    const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:col,transparent:true,opacity:1}));
+    m.position.set(ox+p.x+p.a/2, p.z+p.c/2, oz+p.y+p.b/2);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:0x2a2a2a,transparent:true,opacity:0.55}));
+    m.add(e);
+    const sp=numberSprite(p.idx+1);
+    const s=Math.max(2.2,Math.min(6,Math.min(p.a,p.b)*0.55));
+    sp.scale.set(s,s,1); sp.position.set(0,p.c/2+s*0.15,0); m.add(sp);
+    m.userData={idx:p.idx,edge:e,sprite:sp};
+    group.add(m); meshes.push(m);
+  }
+  const key=ct.C.join('x');
+  if(key!==lastCKey){ lastCKey=key; fitCamera(X,Y,Z); }
+  highlight(hoverIdx);
+}
+function fitCamera(X,Y,Z){
+  const r=Math.sqrt(X*X+Y*Y+Z*Z)/2;
+  const d=r/Math.sin(THREE.MathUtils.degToRad(camera.fov/2))*0.95;
+  const dir=new THREE.Vector3(0.95,0.85,1.15).normalize();
+  controls.target.set(0,Z/2.4,0);
+  camera.position.copy(controls.target).addScaledVector(dir,d);
+  controls.update();
+}
+function highlight(i){
+  hoverIdx=i;
+  document.querySelectorAll('#list tr.item').forEach(tr=>tr.style.outline = (+tr.dataset.i===i)?'2px solid var(--accent)':'');
+  for(const m of meshes){
+    const on = i===null || m.userData.idx===i;
+    m.material.opacity = on?1:0.18;
+    m.material.emissive = new THREE.Color(i!==null&&m.userData.idx===i?0x553311:0x000000);
+    m.userData.edge.material.opacity = on?0.55:0.12;
+    m.userData.sprite.material.opacity = on?1:0.2;
+    m.renderOrder = (i!==null&&m.userData.idx===i)?2:0;
+  }
+}
+function resize(){
+  const w=view.clientWidth,h=view.clientHeight; if(!w||!h) return;
+  renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(view);
+(function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene,camera); })();
+
+// 3Dホバー
+const ray=new THREE.Raycaster(), mouse=new THREE.Vector2(), tip=$('tip');
+let fromList=false;
+renderer.domElement.addEventListener('mousemove',e=>{
+  const rc=renderer.domElement.getBoundingClientRect();
+  mouse.set(((e.clientX-rc.left)/rc.width)*2-1, -((e.clientY-rc.top)/rc.height)*2+1);
+  ray.setFromCamera(mouse,camera);
+  const hit=ray.intersectObjects(meshes,false)[0];
+  if(hit){
+    const i=hit.object.userData.idx, it=items[i];
+    tip.style.display='block'; tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY+12)+'px';
+    tip.textContent=`No.${i+1}　${fmt(it.d[0])} × ${fmt(it.d[1])} × ${fmt(it.d[2])} cm　${fmt(it.kg)} kg`;
+    if(hoverIdx!==i) highlight(i);
+  }else{
+    tip.style.display='none'; if(hoverIdx!==null) highlight(null);
+  }
+});
+renderer.domElement.addEventListener('mouseleave',()=>{tip.style.display='none'; highlight(null);});
+
+recompute();
+addFields[0].focus();
+</script>
+</body>
+</html>
